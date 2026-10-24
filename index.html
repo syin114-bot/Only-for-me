@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>成长控制台</title>
+<style>
+  :root{
+    --paper:#E7EAE4;
+    --panel:#F3F5F0;
+    --ink:#1F2A24;
+    --ink-soft:#5B6960;
+    --line:#C8CDC3;
+    --accent:#3F6B4F;
+    --urgent:#A8452C;
+    --font-serif: 'Iowan Old Style','Palatino Linotype',Georgia,serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--font-sans);
+    line-height:1.5;
+    overflow-x:hidden;
+  }
+  .home{
+    max-width:680px;
+    margin:0 auto;
+    padding:24px 16px 40px;
+  }
+  header{margin-bottom:24px;}
+  header h1{
+    font-family:var(--font-serif);
+    font-size:1.5rem;
+    font-weight:600;
+    margin:0 0 4px;
+  }
+  header p{margin:0;color:var(--ink-soft);font-size:0.85rem;}
+
+  /* always-visible countdown */
+  .hero-countdown{
+    background:var(--panel);
+    border:1px solid var(--line);
+    padding:20px;
+    margin-bottom:20px;
+  }
+  .countdown-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
+  .countdown-num{font-family:var(--font-serif);font-size:3rem;font-weight:700;line-height:1;}
+  .countdown-num.urgent{color:var(--urgent);}
+  .countdown-label{color:var(--ink-soft);font-size:0.9rem;}
+  .date-setting{margin-top:12px;display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--ink-soft);}
+  .date-setting input{
+    font-family:var(--font-sans);border:1px solid var(--line);background:#fff;
+    padding:6px 8px;border-radius:2px;color:var(--ink);
+  }
+
+  /* button grid */
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .tile{
+    background:var(--panel);
+    border:1px solid var(--line);
+    padding:18px 14px;
+    text-align:left;
+    font-family:var(--font-sans);
+    cursor:pointer;
+    color:var(--ink);
+  }
+  .tile:active{border-color:var(--accent);}
+  .tile .tile-title{font-size:0.98rem;font-weight:600;display:block;margin-bottom:4px;}
+  .tile .tile-sub{font-size:0.78rem;color:var(--ink-soft);display:block;}
+  .tile.disabled{opacity:0.45;cursor:default;}
+
+  /* slide-up panel */
+  .panel-overlay{
+    position:fixed;inset:0;
+    background:rgba(20,26,22,0.35);
+    opacity:0;pointer-events:none;
+    transition:opacity .25s ease;
+    z-index:10;
+  }
+  .panel-overlay.open{opacity:1;pointer-events:auto;}
+
+  .panel-sheet{
+    position:fixed;
+    left:0;right:0;bottom:0;
+    max-width:680px;
+    margin:0 auto;
+    max-height:88vh;
+    background:var(--paper);
+    border-top:1px solid var(--line);
+    transform:translateY(100%);
+    transition:transform .28s ease;
+    z-index:11;
+    display:flex;
+    flex-direction:column;
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  .panel-sheet.open{transform:translateY(0);}
+
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 16px 12px;
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .panel-head h2{
+    font-family:var(--font-serif);font-size:1.15rem;margin:0;
+  }
+  .panel-close{
+    background:none;border:none;font-size:1.3rem;color:var(--ink-soft);
+    cursor:pointer;padding:4px 8px;
+  }
+  .panel-body{
+    padding:16px;
+    overflow-y:auto;
+  }
+
+  /* score rows (reused inside panel) */
+  .row{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    padding:10px 0;border-bottom:1px solid var(--line);
+  }
+  .row:last-of-type{border-bottom:none;}
+  .row .name{flex:1;}
+  .row .name select{margin-top:6px;}
+  .row input[type=text], .row select{
+    font-family:var(--font-sans);border:1px solid var(--line);background:#fff;
+    padding:6px 8px;border-radius:2px;color:var(--ink);font-size:0.9rem;
+  }
+  .row input[type=text]{width:100%;}
+  .row input[type=number]{
+    width:70px;text-align:right;font-family:var(--font-sans);border:1px solid var(--line);
+    background:#fff;padding:6px 8px;border-radius:2px;color:var(--ink);font-size:0.95rem;
+  }
+  .total-line{
+    display:flex;justify-content:space-between;align-items:baseline;
+    margin-top:14px;padding-top:14px;border-top:2px solid var(--ink);
+  }
+  .total-line .num{font-family:var(--font-serif);font-size:1.8rem;font-weight:700;}
+  .hint{font-size:0.8rem;color:var(--ink-soft);margin-top:10px;}
+  button.add-btn{
+    width:100%;margin-top:12px;padding:10px;background:transparent;
+    border:1px dashed var(--line);border-radius:2px;color:var(--ink-soft);
+    font-family:var(--font-sans);font-size:0.88rem;cursor:pointer;
+  }
+  .remove-btn{background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:1rem;padding:2px 6px;}
+
+  footer{text-align:center;color:var(--ink-soft);font-size:0.78rem;margin-top:30px;}
+
+  @media (prefers-reduced-motion: reduce){
+    .panel-sheet, .panel-overlay{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="home">
+  <header>
+    <h1>成长控制台</h1>
+    <p>按进去用，不用一路往下翻</p>
+  </header>
+
+  <div class="hero-countdown">
+    <div class="countdown-row">
+      <div class="countdown-num" id="countdownNum">—</div>
+      <div class="countdown-label">天 · 距离 SPM</div>
+    </div>
+    <div class="date-setting">
+      <label for="spmDate">考试日期：</label>
+      <input type="date" id="spmDate">
+    </div>
+  </div>
+
+  <div class="grid">
+    <button class="tile" data-panel="scorePanel">
+      <span class="tile-title">积分追踪</span>
+      <span class="tile-sub">职位 · 阅读 · 比赛</span>
+    </button>
+    <button class="tile disabled" disabled>
+      <span class="tile-title">情报中心</span>
+      <span class="tile-sub">下一批加入</span>
+    </button>
+    <button class="tile disabled" disabled>
+      <span class="tile-title">日志与复盘</span>
+      <span class="tile-sub">下一批加入</span>
+    </button>
+    <button class="tile disabled" disabled>
+      <span class="tile-title">挫折复盘本</span>
+      <span class="tile-sub">下一批加入</span>
+    </button>
+  </div>
+</div>
+
+<footer>数据只存在你这台设备的浏览器里（IndexedDB），换设备不会同步。</footer>
+
+<!-- overlay + sheet for score panel -->
+<div class="panel-overlay" id="overlay"></div>
+<div class="panel-sheet" id="scorePanel">
+  <div class="panel-head">
+    <h2>积分追踪</h2>
+    <button class="panel-close" aria-label="关闭">×</button>
+  </div>
+  <div class="panel-body">
+    <div id="scoreRows"></div>
+    <button class="add-btn" id="addRowBtn">+ 添加一项</button>
+    <div class="total-line">
+      <span>合计</span>
+      <span class="num" id="totalScore">0</span>
+    </div>
+    <p class="hint">分数对照你学校的评分表自行填写——这个数字没有统一标准，以你老师给的表为准。</p>
+  </div>
+</div>
+
+<script>
+const DB_NAME = 'growth_console';
+const DB_VERSION = 1;
+let db;
+
+function openDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', { keyPath: 'key' });
+      if (!d.objectStoreNames.contains('scoreItems')) d.createObjectStore('scoreItems', { keyPath: 'id', autoIncrement: true });
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+function txStore(storeName, mode){ return db.transaction(storeName, mode).objectStore(storeName); }
+
+async function getSetting(key){
+  return new Promise((resolve) => {
+    const req = txStore('settings','readonly').get(key);
+    req.onsuccess = () => resolve(req.result ? req.result.value : null);
+    req.onerror = () => resolve(null);
+  });
+}
+async function setSetting(key, value){
+  return new Promise((resolve) => {
+    const req = txStore('settings','readwrite').put({ key, value });
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => resolve(false);
+  });
+}
+async function getAllScoreItems(){
+  return new Promise((resolve) => {
+    const items = [];
+    const req = txStore('scoreItems','readonly').openCursor();
+    req.onsuccess = (e) => {
+      const cursor = e.target.result;
+      if (cursor){ items.push(cursor.value); cursor.continue(); } else resolve(items);
+    };
+    req.onerror = () => resolve([]);
+  });
+}
+async function addScoreItem(item){
+  return new Promise((resolve) => {
+    const req = txStore('scoreItems','readwrite').add(item);
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = () => resolve(null);
+  });
+}
+async function updateScoreItem(item){
+  return new Promise((resolve) => {
+    const req = txStore('scoreItems','readwrite').put(item);
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => resolve(false);
+  });
+}
+async function deleteScoreItem(id){
+  return new Promise((resolve) => {
+    const req = txStore('scoreItems','readwrite').delete(id);
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => resolve(false);
+  });
+}
+
+function renderCountdown(dateStr){
+  const numEl = document.getElementById('countdownNum');
+  if (!dateStr){ numEl.textContent = '—'; numEl.classList.remove('urgent'); return; }
+  const target = new Date(dateStr + 'T00:00:00');
+  const now = new Date(); now.setHours(0,0,0,0);
+  const diffDays = Math.ceil((target - now) / 86400000);
+  numEl.textContent = diffDays >= 0 ? diffDays : 0;
+  numEl.classList.toggle('urgent', diffDays <= 60 && diffDays >= 0);
+}
+
+const CATEGORY_OPTIONS = ['职位','阅读计划','校外比赛','其他'];
+
+function rowTemplate(item){
+  const div = document.createElement('div');
+  div.className = 'row';
+  div.dataset.id = item.id;
+  div.innerHTML = `
+    <div class="name">
+      <input type="text" class="item-name" placeholder="项目名称，比如 篮球主席" value="${item.name ? item.name.replace(/"/g,'&quot;') : ''}">
+      <select class="item-cat">
+        ${CATEGORY_OPTIONS.map(c => `<option value="${c}" ${c===item.category?'selected':''}>${c}</option>`).join('')}
+      </select>
+    </div>
+    <input type="number" class="item-score" value="${item.score || 0}" step="0.5">
+    <button class="remove-btn" title="删除">×</button>
+  `;
+  return div;
+}
+
+async function renderScoreRows(){
+  const container = document.getElementById('scoreRows');
+  container.innerHTML = '';
+  const items = await getAllScoreItems();
+  items.forEach(item => container.appendChild(rowTemplate(item)));
+  updateTotal(items);
+}
+function updateTotal(items){
+  const total = items.reduce((sum, it) => sum + (parseFloat(it.score) || 0), 0);
+  document.getElementById('totalScore').textContent = total;
+}
+async function handleRowChange(e){
+  const row = e.target.closest('.row');
+  if (!row) return;
+  const id = Number(row.dataset.id);
+  if (e.target.classList.contains('remove-btn')){
+    await deleteScoreItem(id);
+    row.remove();
+    updateTotal(await getAllScoreItems());
+    return;
+  }
+  const name = row.querySelector('.item-name').value;
+  const category = row.querySelector('.item-cat').value;
+  const score = parseFloat(row.querySelector('.item-score').value) || 0;
+  await updateScoreItem({ id, name, category, score });
+  updateTotal(await getAllScoreItems());
+}
+
+// panel open/close
+function openPanel(panelId){
+  document.getElementById(panelId).classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+function closeAllPanels(){
+  document.querySelectorAll('.panel-sheet').forEach(p => p.classList.remove('open'));
+  document.getElementById('overlay').classList.remove('open');
+}
+
+async function init(){
+  db = await openDB();
+
+  const savedDate = await getSetting('spmDate');
+  if (savedDate){ document.getElementById('spmDate').value = savedDate; renderCountdown(savedDate); }
+  document.getElementById('spmDate').addEventListener('change', async (e) => {
+    await setSetting('spmDate', e.target.value);
+    renderCountdown(e.target.value);
+  });
+
+  await renderScoreRows();
+
+  document.getElementById('scoreRows').addEventListener('input', handleRowChange);
+  document.getElementById('scoreRows').addEventListener('click', (e) => {
+    if (e.target.classList.contains('remove-btn')) handleRowChange(e);
+  });
+  document.getElementById('addRowBtn').addEventListener('click', async () => {
+    await addScoreItem({ name:'', category:'职位', score:0 });
+    await renderScoreRows();
+  });
+
+  document.querySelectorAll('.tile[data-panel]').forEach(btn => {
+    btn.addEventListener('click', () => openPanel(btn.dataset.panel));
+  });
+  document.querySelectorAll('.panel-close').forEach(btn => {
+    btn.addEventListener('click', closeAllPanels);
+  });
+  document.getElementById('overlay').addEventListener('click', closeAllPanels);
+}
+
+init();
+</script>
+</body>
+</html>
